@@ -1,2 +1,2 @@
-# income_tax_calculator
-India Income tax calculator
+# streamlit-india-income-tax-calculator
+Income Tax calculator india streamlit

@@ -40,7 +40,58 @@ def run():
 
     st.title("India Income Tax calculator")
     
-    
+    @st.cache()
+    def tax_calc(income):
+        if income <= 500000:
+            tax = 0
+        elif income <= 1000000: 
+            tax = (income - 500000) * 0.2 + 12500              # 10% on income above 10K
+        elif income <= 5000000:
+            tax = (income-1000000) * 0.3 + 112500  # 20% on income above 20K, plus tax on 10K of income below 20K
+        elif income <= 10000000: 
+            tax = ((income-1000000) * 0.3 + 112500 ) * 1.10            # 10% Surcharge on income above 50 lakhs
+        elif income <= 20000000:                # 15% Surcharge on income above 1cr upto 2 cr 
+            tax = ((income-1000000) * 0.3 + 112500 ) * 1.15 
+        elif income <= 50000000:   # 25% Surcharge on income above 2cr upto 5cr 
+            tax = ((income-1000000) * 0.3 + 112500 ) * 1.25     
+        else:
+            tax = ((income-1000000) * 0.3 + 112500 ) * 1.37    # 37% Surcharge on income above 5cr 
+      
+        return tax
+    @st.cache()
+    def tax_calc_new_regime(income):
+        
+        if income <= 300000:
+            tax = 0
+        elif income <= 600000:  
+            tax = (income - 300000)*0.05           # 5% tax above 3LPA upto 6 LPA
+        elif income <= 900000: 
+            tax = (income - 600000)*0.1 + 15000     # 10% on income above 6 LPA upto 9 LPA
+        elif income <= 1200000: 
+            tax = (income - 900000)*0.15 + 45000   # 15% on income from 9 LPA upto 12 LPA
+        elif income <= 1500000: 
+            tax = (income - 1200000)*0.2 + 90000   # 20% on income from 12 LPA upto 15 LPA
+        else: 
+            tax = (income - 1500000)*0.3 + 150000  # 30% on income above 15 LPA
+        
+        if income <= 700000:
+            tax = 0
+        
+        # Add surcharge based on income range
+        if income <= 5000000:
+            surcharge_rate = 0
+        elif income <= 10000000:
+            surcharge_rate = 0.1 # 10% Surcharge on income above 50 lakhs
+        elif income <= 20000000:
+            surcharge_rate = 0.15  # 15% Surcharge on income above 1cr upto 2 cr 
+        else:
+            surcharge_rate = 0.25 # 25% Surcharge on income above 2cr
+        
+        surcharge = tax * surcharge_rate
+        total_tax = tax + surcharge
+        
+        return total_tax
+
     
     if add_selectbox == 'Old regime':
         location = st.selectbox('Enter your location Metro or non metro',("Metro","Non-Metro"))

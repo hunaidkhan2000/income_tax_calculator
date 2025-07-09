@@ -3,141 +3,139 @@
 ## Author- Hunaidkhan Pathan
 # Updated date - 08-07-2025
 ##streamlit run streamlit_incometax_calculator.py
-
 import streamlit as st
 import math
 
+# Surcharge Calculation
 def calc_surcharge(income, tax):
     rate = 0
-    if income > 5e6:
+    if income > 50000000:
         rate = 0.37
-    elif income > 2e6:
+    elif income > 20000000:
         rate = 0.25
-    elif income > 1e6:
+    elif income > 10000000:
         rate = 0.15
-    elif income > 0.5e6:
+    elif income > 5000000:
         rate = 0.10
-    return tax * rate
+    return tax * rate, rate
 
-@st.cache_data
-def tax_old(income):
+# Old Regime
+def compute_old_regime(taxable_income):
+    steps = []
     tax = 0
-    if income > 250_000:
-        tax += (min(income, 500_000) - 250_000) * 0.05
-    if income > 500_000:
-        tax += (min(income, 1_000_000) - 500_000) * 0.20
-    if income > 1_000_000:
-        tax += (income - 1_000_000) * 0.30
+    if taxable_income > 250000:
+        slab_amt = min(taxable_income, 500000) - 250000
+        slab_tax = slab_amt * 0.05
+        tax += slab_tax
+        steps.append(f"5% on ₹{slab_amt:,} = ₹{slab_tax:,.0f}")
+    if taxable_income > 500000:
+        slab_amt = min(taxable_income, 1000000) - 500000
+        slab_tax = slab_amt * 0.20
+        tax += slab_tax
+        steps.append(f"20% on ₹{slab_amt:,} = ₹{slab_tax:,.0f}")
+    if taxable_income > 1000000:
+        slab_amt = taxable_income - 1000000
+        slab_tax = slab_amt * 0.30
+        tax += slab_tax
+        steps.append(f"30% on ₹{slab_amt:,} = ₹{slab_tax:,.0f}")
 
-    # Apply 87A rebate for old regime
-    rebate = min(tax, 12_500) if income <= 500_000 else 0  # ₹12,500 rebate up to ₹5 L :contentReference[oaicite:1]{index=1}
-    tax = max(0, tax - rebate)
+    rebate = min(12500, tax) if taxable_income <= 500000 else 0
+    if rebate:
+        tax -= rebate
+        steps.append(f"87A rebate = ₹{rebate:,.0f}")
 
-    tax += calc_surcharge(income, tax)
-    tax *= 1.04
-    return tax
+    surcharge, rate = calc_surcharge(taxable_income, tax)
+    tax += surcharge
+    steps.append(f"Surcharge @ {rate*100}% = ₹{surcharge:,.0f}")
 
-@st.cache_data
-def tax_new(income):
-    taxable = max(0, income - 75_000)
-    slabs = [(400_000, 0), (800_000, 0.05), (1_200_000, 0.10),
-             (1_600_000, 0.15), (2_000_000, 0.20), (2_400_000, 0.25),
-             (float('inf'), 0.30)]
-    tax = 0; prev = 0
+    cess = tax * 0.04
+    total_tax = tax + cess
+    steps.append(f"Cess 4% on ₹{tax:,.0f} = ₹{cess:,.0f}")
+    steps.append(f"Total (Old Regime) = ₹{total_tax:,.0f}")
+
+    return round(total_tax), steps
+
+# New Regime
+def compute_new_regime(gross_income):
+    steps = []
+    std_deduction = 75000
+    taxable = max(0, gross_income - std_deduction)
+
+    steps.append(f"Gross Income = ₹{gross_income:,}")
+    steps.append(f"Standard Deduction = ₹{std_deduction:,}")
+    steps.append(f"Taxable Income = ₹{taxable:,}")
+
+    slabs = [
+        (300000, 0.00),
+        (600000, 0.05),
+        (900000, 0.10),
+        (1200000, 0.15),
+        (1500000, 0.20),
+        (float('inf'), 0.30)
+    ]
+
+    tax = 0
+    prev_limit = 0
     for limit, rate in slabs:
-        if taxable > prev:
-            tax += (min(taxable, limit) - prev) * rate
-            prev = limit
+        if taxable > prev_limit:
+            slab_amount = min(limit - prev_limit, taxable - prev_limit)
+            slab_tax = slab_amount * rate
+            tax += slab_tax
+            steps.append(f"{int(rate*100)}% on ₹{slab_amount:,} = ₹{slab_tax:,.0f}")
+            prev_limit = limit
         else:
             break
 
-    tax += calc_surcharge(income, tax)
-    tax *= 1.04
-    return tax
+    # 87A rebate
+    rebate = 0
+    if taxable <= 700000:
+        rebate = min(tax, 25000)
+        tax -= rebate
+        steps.append(f"87A rebate = ₹{rebate:,.0f}")
 
+    surcharge, rate = calc_surcharge(gross_income, tax)
+    tax += surcharge
+    steps.append(f"Surcharge @ {rate*100}% = ₹{surcharge:,.0f}")
+
+    cess = tax * 0.04
+    total_tax = tax + cess
+    steps.append(f"Cess 4% on ₹{tax:,.0f} = ₹{cess:,.0f}")
+    steps.append(f"Total (New Regime) = ₹{total_tax:,.0f}")
+
+    return round(total_tax), taxable, steps
+
+
+# Streamlit App
 def run():
-    # Sidebar with images
-    st.sidebar.text("Built with Streamlit")
-    ##Use Markdown with custom CSS to style the text
-    st.sidebar.markdown(
-        """
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
-
-        <style>
-        .fancy-title {
-            font-size: 24px !important;
-            color: white;
-            font-family: 'Montserrat', sans-serif;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px #000000;
-        }
-        </style>
-
-        <div class="fancy-title">
-            Hunaidkhan Pathan
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    with st.sidebar:
-       st.markdown("[Hunaidkhan's Linkedin profile](https://www.linkedin.com/in/hunaidkhan/)")
-    #st.page_link("https://www.linkedin.com/in/hunaidkhan/", label="Hunaidkhan Linkedin profile")
-    st.sidebar.image("HK _Tricks.jpg", use_container_width=True)
-    st.sidebar.text("") 
-    
-    st.sidebar.image("dsp3.jpeg", width=200)
-    st.sidebar.text("")
-    # Use Markdown with custom CSS to style the text
-    # Use Markdown with custom CSS to style the text
-
-#
-
-
     st.title("🇮🇳 India Income Tax Calculator (FY 2025‑26)")
-    basic = st.number_input("Yearly Basic Salary", min_value=0,value=1500000)
-    da = st.number_input("Yearly DA", min_value=0)
-    hra = st.number_input("Yearly HRA", min_value=0)
-    lta = st.number_input("Yearly LTA", min_value=0)
-    special = st.number_input("Yearly Special Allowance", min_value=0)
-    pf = st.number_input("PF deduction (Old Regime)", min_value=0, max_value=150_000, value=80000)
-    sodexo = st.number_input("Sodexo deduction", min_value=0, max_value=36_000, value=2000)
-    ded_80c = st.number_input("80C deduction beyond PF", min_value=0, max_value=150000-pf, value=0)
-    pt = st.number_input("Professional Tax", min_value=0, max_value=3000, value=200)
-    ded_80d = st.number_input("80D Medical", min_value=0, max_value=75000, value=0)
-    ded_nps = st.number_input("80CCD (NPS)", min_value=0, max_value=150000, value=0)
-    ded_80g = st.number_input("80G Donation", min_value=0, value=0)
-    ded_home = st.number_input("Home-loan interest", min_value=0, max_value=350000, value=0)
-    location = st.selectbox("Metro or Non‑Metro (Old Regime HRA)", ["Metro", "Non‑Metro"])
 
-    if st.button("Analyze Taxes ▶"):
-        # Old Regime taxable income
-        da_hra = basic + da
-        actual_hra = min(hra,
-                         da_hra * (0.5 if location == "Metro" else 0.4),
-                         hra - 0.1 * da_hra)
-        hra_exempt = max(0, math.ceil(actual_hra))
-        taxable_old = basic + da + hra + lta + special - (
-            pf + sodexo + ded_80c + pt + ded_80d + ded_nps +
-            ded_80g + ded_home + 50_000 + hra_exempt
-        )
-        taxable_old = max(0, taxable_old)
+    income = st.number_input("Enter Gross Salary (₹)", value=1280000)
 
-        # New Regime taxable income
-        taxable_new = max(0, basic + da + hra + lta + special - 75_000)
+    old_tax, old_steps = compute_old_regime(income)
+    new_tax, new_taxable, new_steps = compute_new_regime(income)
 
-        old_tax = math.ceil(tax_old(taxable_old))
-        new_tax = math.ceil(tax_new(taxable_new))
-        diff = abs(new_tax - old_tax)
-        better = "Old Regime" if old_tax < new_tax else "New Regime"
+    st.header("🧾 Old Regime Breakdown")
+    for s in old_steps:
+        st.text(s)
 
-        st.markdown("### 📊 Tax Comparison")
-        df = {
-            "": ["Taxable Income", "Total Tax (Yearly)", "Monthly Tax"],
-            "Old Regime": [f"₹{taxable_old:,}", f"₹{old_tax:,}", f"₹{math.ceil(old_tax/12):,}"],
-            "New Regime": [f"₹{taxable_new:,}", f"₹{new_tax:,}", f"₹{math.ceil(new_tax/12):,}"]
-        }
-        st.table(df)
-        st.markdown(f"**💡 Better Regime:** {better}  \n**Tax Saved:** ₹{diff:,}")
+    st.header("🧾 New Regime Breakdown")
+    for s in new_steps:
+        st.text(s)
+
+    # ✅ Comparison Table
+    old_monthly = old_tax // 12
+    new_monthly = new_tax // 12
+    better = "Old Regime" if old_tax < new_tax else "New Regime"
+    diff = abs(old_tax - new_tax)
+
+    st.markdown("### 📊 Tax Comparison")
+    st.table({
+        "": ["Taxable Income", "Total Tax", "Monthly Tax"],
+        "Old Regime": [f"₹{income:,}", f"₹{old_tax:,}", f"₹{old_monthly:,}"],
+        "New Regime": [f"₹{new_taxable:,}", f"₹{new_tax:,}", f"₹{new_monthly:,}"]
+    })
+
+    st.success(f"✅ Better Regime: **{better}**\n💰 Tax Saved: ₹{diff:,}")
 
 if __name__ == "__main__":
     run()
